@@ -4,30 +4,163 @@ const Orphanage = require("../models/Orphanage");
 
 const router = express.Router();
 
+router.post("/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required"
+      });
+    }
+
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    await Otp.findOneAndUpdate(
+      { email },
+      {
+        otp,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+      },
+      {
+        upsert: true,
+        new: true
+      }
+    );
+
+    await transporter.sendMail({
+      from: process.env.EMAIL,
+      to: email,
+      subject: "Email Verification OTP",
+      html: `
+        <div style="font-family: Arial, sans-serif;">
+          <h2>Email Verification</h2>
+          <p>Your OTP is:</p>
+          <h1>${otp}</h1>
+          <p>This OTP is valid for 5 minutes.</p>
+        </div>
+      `
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "OTP sent successfully"
+    });
+
+  } catch (error) {
+    console.error("Send OTP Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to send OTP"
+    });
+  }
+});
+
+router.post("/verify-otp", async (req, res) => {
+  const { email, otp } = req.body;
+
+  const record = await Otp.findOne({ email });
+
+  if (!record) {
+    return res.status(400).json({
+      success: false,
+      message: "OTP not found"
+    });
+  }
+
+  if (record.otp !== otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid OTP"
+    });
+  }
+
+  if (Date.now() > record.expiresAt) {
+    return res.status(400).json({
+      success: false,
+      message: "OTP expired"
+    });
+  }
+
+  res.json({
+    success: true,
+    message: "OTP verified"
+  });
+});
+
 // ✅ Register User Route (POST /register)
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password } = req.body;
 
-    // ❌ Check if all fields are provided
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: "All fields are required" });
+    const {
+      username,
+      email,
+      password,
+      otp
+    } = req.body;
+
+    if (!username || !email || !password || !otp) {
+      return res.status(400).json({
+        error: "All fields are required"
+      });
     }
 
-    // ✅ Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser =
+      await User.findOne({ email });
+
     if (existingUser) {
-      return res.status(409).json({ error: "Email already exists" }); // 409 Conflict
+      return res.status(409).json({
+        error: "Email already exists"
+      });
     }
 
-    // ✅ Save new user to the database (Plain password)
-    const newUser = new User({ username, email, password });
+    const otpRecord =
+      await Otp.findOne({ email });
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        error: "OTP not found"
+      });
+    }
+
+    if (otpRecord.otp !== otp) {
+      return res.status(400).json({
+        error: "Invalid OTP"
+      });
+    }
+
+    if (Date.now() > otpRecord.expiresAt) {
+      return res.status(400).json({
+        error: "OTP expired"
+      });
+    }
+
+    const newUser = new User({
+      username,
+      email,
+      password,
+      isVerified: true
+    });
+
     await newUser.save();
 
-    res.status(201).json({ message: "User registered successfully" }); // 201 Created
+    await Otp.deleteOne({ email });
+
+    res.status(201).json({
+      message: "User registered successfully"
+    });
+
   } catch (err) {
-    console.error("Server Error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+
+    console.error(err);
+
+    res.status(500).json({
+      error: "Internal Server Error"
+    });
   }
 });
 

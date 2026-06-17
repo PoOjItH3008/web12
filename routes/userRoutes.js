@@ -1,5 +1,6 @@
 const express = require("express");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
+
 
 const User = require("../models/User");
 const Otp = require("../models/Otp");
@@ -7,22 +8,7 @@ const Orphanage = require("../models/Orphanage");
 
 const router = express.Router();
 
-/* ===========================
-   Nodemailer Configuration
-=========================== */
-
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL,
-    pass: process.env.APP_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /* ===========================
    SEND OTP
@@ -59,11 +45,10 @@ router.post("/send-otp", async (req, res) => {
       }
     );
 
-    await transporter.sendMail({
-      from: process.env.EMAIL,
+    const result = await resend.emails.send({
+      from: "onboarding@resend.dev",
       to: email,
       subject: "Email Verification OTP",
-
       html: `
         <div style="font-family: Arial, sans-serif;">
           <h2>Email Verification</h2>
@@ -81,6 +66,8 @@ router.post("/send-otp", async (req, res) => {
       `
     });
 
+    console.log("Resend Result:", result);
+
     return res.status(200).json({
       success: true,
       message: "OTP sent successfully"
@@ -92,11 +79,10 @@ router.post("/send-otp", async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to send OTP"
+      message: error.message
     });
   }
 });
-
 /* ===========================
    VERIFY OTP
 =========================== */

@@ -8,13 +8,7 @@ const userRoutes = require("./routes/userRoutes");
 const adminApprovalOrphanage = require("./routes/admin");
 const orphanRoute = require("./routes/orphansRoute");
 const nodemailer = require("nodemailer");
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL,
-    pass: process.env.APP_PASSWORD
-  }
-});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 

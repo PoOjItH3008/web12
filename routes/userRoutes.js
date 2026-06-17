@@ -1,10 +1,15 @@
 const express = require("express");
+const nodemailer = require("nodemailer");
+
 const User = require("../models/User");
-const Orphanage = require("../models/Orphanage")
 const Otp = require("../models/Otp");
+const Orphanage = require("../models/Orphanage");
 
 const router = express.Router();
-const nodemailer = require("nodemailer");
+
+/* ===========================
+   Nodemailer Configuration
+=========================== */
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -14,8 +19,13 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+/* ===========================
+   SEND OTP
+=========================== */
+
 router.post("/send-otp", async (req, res) => {
   try {
+
     const { email } = req.body;
 
     if (!email) {
@@ -32,8 +42,11 @@ router.post("/send-otp", async (req, res) => {
     await Otp.findOneAndUpdate(
       { email },
       {
+        email,
         otp,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+        expiresAt: new Date(
+          Date.now() + 5 * 60 * 1000
+        )
       },
       {
         upsert: true,
@@ -45,64 +58,105 @@ router.post("/send-otp", async (req, res) => {
       from: process.env.EMAIL,
       to: email,
       subject: "Email Verification OTP",
+
       html: `
         <div style="font-family: Arial, sans-serif;">
           <h2>Email Verification</h2>
+
           <p>Your OTP is:</p>
-          <h1>${otp}</h1>
-          <p>This OTP is valid for 5 minutes.</p>
+
+          <h1 style="color:#2563eb;">
+            ${otp}
+          </h1>
+
+          <p>
+            This OTP is valid for 5 minutes.
+          </p>
         </div>
       `
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "OTP sent successfully"
     });
 
   } catch (error) {
+
     console.error("Send OTP Error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to send OTP"
     });
   }
 });
 
+/* ===========================
+   VERIFY OTP
+=========================== */
+
 router.post("/verify-otp", async (req, res) => {
-  const { email, otp } = req.body;
+  try {
 
-  const record = await Otp.findOne({ email });
+    const { email, otp } = req.body;
 
-  if (!record) {
-    return res.status(400).json({
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required"
+      });
+    }
+
+    const otpRecord =
+      await Otp.findOne({ email });
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP not found"
+      });
+    }
+
+    if (
+      new Date() >
+      otpRecord.expiresAt
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired"
+      });
+    }
+
+    if (
+      otpRecord.otp !== otp
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified"
+    });
+
+  } catch (error) {
+
+    console.error("Verify OTP Error:", error);
+
+    return res.status(500).json({
       success: false,
-      message: "OTP not found"
+      message: "Server error"
     });
   }
-
-  if (record.otp !== otp) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid OTP"
-    });
-  }
-
-  if (Date.now() > record.expiresAt) {
-    return res.status(400).json({
-      success: false,
-      message: "OTP expired"
-    });
-  }
-
-  res.json({
-    success: true,
-    message: "OTP verified"
-  });
 });
 
-// ✅ Register User Route (POST /register)
+/* ===========================
+   REGISTER USER
+=========================== */
+
 router.post("/register", async (req, res) => {
   try {
 
@@ -113,7 +167,12 @@ router.post("/register", async (req, res) => {
       otp
     } = req.body;
 
-    if (!username || !email || !password || !otp) {
+    if (
+      !username ||
+      !email ||
+      !password ||
+      !otp
+    ) {
       return res.status(400).json({
         error: "All fields are required"
       });
@@ -137,22 +196,27 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    if (otpRecord.otp !== otp) {
+    if (
+      new Date() >
+      otpRecord.expiresAt
+    ) {
       return res.status(400).json({
-        error: "Invalid OTP"
+        error: "OTP expired"
       });
     }
 
-    if (Date.now() > otpRecord.expiresAt) {
+    if (
+      otpRecord.otp !== otp
+    ) {
       return res.status(400).json({
-        error: "OTP expired"
+        error: "Invalid OTP"
       });
     }
 
     const newUser = new User({
       username,
       email,
-      password,
+      password, // Use bcrypt in production
       isVerified: true
     });
 
@@ -160,19 +224,22 @@ router.post("/register", async (req, res) => {
 
     await Otp.deleteOne({ email });
 
-    res.status(201).json({
+    return res.status(201).json({
+      success: true,
       message: "User registered successfully"
     });
 
   } catch (err) {
 
-    console.error(err);
+    console.error("Register Error:", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Internal Server Error"
     });
   }
 });
+
+module.exports = router;
 
 // ✅ Get All Users (GET /users)
 router.get("/users", async (req, res) => {

@@ -1,8 +1,18 @@
 const express = require("express");
 const User = require("../models/User");
-const Orphanage = require("../models/Orphanage");
+const Orphanage = require("../models/Orphanage")
+const Otp = require("../models/Otp");
 
 const router = express.Router();
+const nodemailer = require("nodemailer");
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL,
+    pass: process.env.APP_PASSWORD
+  }
+});
 
 router.post("/send-otp", async (req, res) => {
   try {

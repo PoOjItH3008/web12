@@ -165,6 +165,7 @@ router.post("/register", async (req, res) => {
       !otp
     ) {
       return res.status(400).json({
+         success: false,
         error: "All fields are required"
       });
     }
@@ -174,6 +175,7 @@ router.post("/register", async (req, res) => {
 
     if (existingUser) {
       return res.status(409).json({
+         success: false,
         error: "Email already exists"
       });
     }
@@ -183,6 +185,7 @@ router.post("/register", async (req, res) => {
 
     if (!otpRecord) {
       return res.status(400).json({
+         success: false,
         error: "OTP not found"
       });
     }
@@ -192,6 +195,7 @@ router.post("/register", async (req, res) => {
       otpRecord.expiresAt
     ) {
       return res.status(400).json({
+         success: false,
         error: "OTP expired"
       });
     }
@@ -200,6 +204,7 @@ router.post("/register", async (req, res) => {
       otpRecord.otp !== otp
     ) {
       return res.status(400).json({
+         success: false,
         error: "Invalid OTP"
       });
     }
@@ -225,6 +230,7 @@ router.post("/register", async (req, res) => {
     console.error("Register Error:", err);
 
     return res.status(500).json({
+       success: false,
       error: "Internal Server Error"
     });
   }

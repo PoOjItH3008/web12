@@ -236,7 +236,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-module.exports = router;
+
 
 // ✅ Get All Users (GET /users)
 router.get("/users", async (req, res) => {
